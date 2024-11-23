@@ -1,0 +1,8 @@
+<odoo>
+    <!-- Define the model reference -->
+    <record id="meta_openphone_api_sync_model" model="ir.model">
+        <field name="name">openphone.contact.sync</field>
+        <field name="model">openphone.contact.sync</field>
+        <field name="state">manual</field>
+    </record>
+</odoo>
