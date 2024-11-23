@@ -2,7 +2,7 @@
 
 <odoo>
     <record id="default_openphone_api_key" model="ir.config_parameter">
-        <field name="key">openphone.api_key</field>
+        <field name="key">openphone.api.key</field>
         <field name="value">DSD3AjgwLTZXDlLGSW6KrQM6HaRjgPUO</field>
     </record>    
 </odoo>
