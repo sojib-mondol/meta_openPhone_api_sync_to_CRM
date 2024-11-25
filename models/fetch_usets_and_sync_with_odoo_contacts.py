@@ -16,8 +16,8 @@ class OpenPhoneContactSync(models.Model):
     def fetch_and_sync_contacts(self):
         """Fetch users from OpenPhone and sync them with Odoo contacts."""
         api_key = self.env['ir.config_parameter'].sudo().get_param('openphone.api.key', default='')
-        _logger.debug("Using OpenPhone API key: %s", api_key)
-        print(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{api_key}")
+        # _logger.debug("Using OpenPhone API key: %s", api_key)
+        # print(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{api_key}")
         
         if not api_key:
             _logger.warning("OpenPhone API key is missing. Please configure it.")
@@ -34,7 +34,7 @@ class OpenPhoneContactSync(models.Model):
         try:
             # Fetch data from OpenPhone API
             response = requests.get(api_url, headers=headers)
-            response.raise_for_status()  # Raise exception for HTTP errors
+            response.raise_for_status()  
             data = response.json().get("data", [])
             _logger.info("Fetched %d phone numbers from OpenPhone API", len(data))
             
