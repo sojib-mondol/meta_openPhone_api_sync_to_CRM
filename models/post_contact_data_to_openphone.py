@@ -1,5 +1,3 @@
-
-
 # -*- coding: utf-8 -*-
 import logging
 import requests
@@ -47,9 +45,17 @@ class ResPartner(models.Model):
             _logger.debug("OpenPhone API Response Status Code: %s", response.status_code)
             _logger.debug("OpenPhone API Response Content: %s", response.text)
 
-            # Raise an exception for HTTP errors
-            response.raise_for_status()
-            _logger.info("Successfully created contact in OpenPhone: %s", partner.name)
+            # Check for success
+            if response.status_code == 201:
+                response_data = response.json()
+                contact_id = response_data.get("data", {}).get("id")
+                _logger.info("Successfully created contact in OpenPhone: %s with ID %s", partner.name, contact_id)
+                partner.write({'openphone_contact_id': contact_id})
+            else:
+                # Log and raise an error for non-successful status codes
+                _logger.error("Failed to create contact in OpenPhone: %s", response.text)
+                raise UserError(_("Failed to create contact in OpenPhone. Check logs for details."))
+            
         except requests.exceptions.RequestException as e:
             _logger.error("Failed to create contact in OpenPhone: %s", str(e))
             _logger.error("Response Content: %s", response.text if 'response' in locals() else "No response received")
