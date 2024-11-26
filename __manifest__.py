@@ -1,8 +1,8 @@
 {
     'name': 'Opne Phone Api Sync to the CRM',
     'version': '18.1.0',
-    'summary': 'A brief summary of your module',
-    'description': 'A detailed description of your module, including features and purpose.',
+    'summary': 'Synchronize OpenPhone data with Odoo CRM seamlessly.',
+    'description': 'This module integrates OpenPhone API with Odoo CRM to synchronize contacts and communication data.',
     'author': 'Sojib Mondol',
     'website': 'https://metamorphosis.com.bd',
     'license': 'LGPL-3',  
