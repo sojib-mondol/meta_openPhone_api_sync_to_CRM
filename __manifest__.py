@@ -9,6 +9,7 @@
     'category': 'Uncategorized', 
     'depends': ['base', 'web', 'crm', 'contacts'],  
     'data': [
+        'security/ir.model.access.csv',
         'views/res_config_settings_views.xml',
         'views/openphone_sync_menu.xml',
         'views/add_openphone_contact_id_in_res_partner_from_view.xml',
