@@ -1,12 +1,9 @@
-# -*- coding: utf-8 -*-
 import logging
 import requests
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 
-
 _logger = logging.getLogger(__name__)
-
 
 class OpenPhoneContactSync(models.Model):
     _name = 'openphone.contact.sync'
@@ -14,13 +11,10 @@ class OpenPhoneContactSync(models.Model):
 
     @api.model
     def fetch_and_sync_contacts(self):
-        """Fetch users from OpenPhone and sync them with Odoo contacts."""
+        """Fetch phone numbers and sync with Odoo contacts."""
         api_key = self.env['ir.config_parameter'].sudo().get_param('openphone.api.key', default='')
-        # _logger.debug("Using OpenPhone API key: %s", api_key)
-        # print(f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{api_key}")
-        
+
         if not api_key:
-            _logger.warning("OpenPhone API key is missing. Please configure it.")
             raise UserError(_("No OpenPhone API key found. Please configure it in settings."))
 
         # API URL
@@ -34,42 +28,51 @@ class OpenPhoneContactSync(models.Model):
         try:
             # Fetch data from OpenPhone API
             response = requests.get(api_url, headers=headers)
-            response.raise_for_status()  
+            response.raise_for_status()  # Raise an exception for HTTP errors
             data = response.json().get("data", [])
-            _logger.info("Fetched %d phone numbers from OpenPhone API", len(data))
             
             if not data:
-                _logger.warning("No data found in the OpenPhone API response.")
-                
-            for item in data:
-                # Sync users from OpenPhone to Odoo contacts
-                for user in item.get('users', []):
-                    self._sync_openphone_user_to_odoo(user)
+                _logger.warning("No phone numbers found in OpenPhone API response.")
+                return
+
+            for phone_data in data:
+                # Process each phone number entry
+                self._sync_phone_number(phone_data)
 
             _logger.info("OpenPhone contact synchronization completed successfully.")
-            return None  # Return None instead of True to avoid action processing issues
 
         except requests.exceptions.RequestException as e:
             _logger.error("Failed to fetch data from OpenPhone API: %s", str(e))
-            raise ValueError(_("Failed to fetch data from OpenPhone API."))
+            raise UserError(_("Failed to fetch data from OpenPhone API."))
 
+    def _sync_phone_number(self, phone_data):
+        """Sync a single phone number and create contact."""
+        phone_number = phone_data.get('number')
+        formatted_phone_number = phone_data.get('formattedNumber')  # Use formatted number
+        phone_name = phone_data.get('name', '')  # Use the name from phone data (e.g., "ALL CITY CLEANER" or "America")
 
-    def _sync_openphone_user_to_odoo(self, user_data):
-        """Create or update an Odoo contact based on OpenPhone user data."""
-        email = user_data.get('email')
-        if not email:
-            _logger.warning("Skipping user with missing email: %s", user_data)
+        if not phone_number or not phone_name:
+            _logger.warning("Phone number or name missing. Skipping: %s", phone_data)
             return
 
-        partner = self.env['res.partner'].search([('email', '=', email)], limit=1)
-        values = {
-            'name': f"{user_data.get('firstName')} {user_data.get('lastName')}".strip(),
-            'email': email,
-        }
+        # Log the phone data to debug
+        _logger.info("Processing phone data: number=%s, name=%s", phone_number, phone_name)
 
-        if partner:
-            _logger.info("Updating existing contact: %s", email)
-            partner.write(values)
+        # Check if a contact already exists with the same number
+        existing_contact = self.env['res.partner'].search([('phone', '=', formatted_phone_number)], limit=1)
+
+        if existing_contact:
+            _logger.info("Contact already exists with number: %s", formatted_phone_number)
         else:
-            _logger.info("Creating new contact: %s", email)
-            self.env['res.partner'].create(values)
+            # Create new contact in Odoo
+            contact_values = {
+                'name': phone_name,  # Use the name from the phone data
+                'phone': formatted_phone_number,  # Use the formatted phone number
+            }
+            
+            _logger.info("Creating new contact with values: %s", contact_values)
+            
+            new_contact = self.env['res.partner'].create(contact_values)
+            new_contact.message_post(
+                body=_("New contact created with phone number '%s'.") % formatted_phone_number
+            )
