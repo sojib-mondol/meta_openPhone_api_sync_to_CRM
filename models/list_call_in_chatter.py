@@ -4,6 +4,8 @@ import requests
 import logging
 from datetime import datetime
 import urllib.parse
+from markupsafe import Markup
+
 
 _logger = logging.getLogger(__name__)
 
@@ -24,7 +26,7 @@ class ResPartner(models.Model):
 
         return cleaned_phone
 
-    def _format_call_log_message(self, call, sanitized_phone):
+    def _format_call_log_message(self, call, sanitized_phone, index):
         """
         Format a single call log into an HTML message for the chatter.
         """
@@ -42,7 +44,7 @@ class ResPartner(models.Model):
 
         return _(
             """
-            <b>New Call Log:</b><br/>
+            <b>Call Log %d:</b><br/>
             <ul>
                 <li><b>Direction:</b> %s</li>
                 <li><b>Status:</b> %s</li>
@@ -52,7 +54,7 @@ class ResPartner(models.Model):
                 <li><b>Completed At:</b> %s</li>
             </ul>
             """
-        ) % (direction, status, duration, participants, created_at, completed_at)
+        ) % (index, direction, status, duration, participants, created_at, completed_at)
 
     def action_fetch_call_logs(self):
         """
@@ -101,14 +103,14 @@ class ResPartner(models.Model):
                     continue
 
                 messages = [
-                    self._format_call_log_message(call, sanitized_phone)
-                    for call in call_logs
+                    self._format_call_log_message(call, sanitized_phone, index + 1)
+                    for index, call in enumerate(call_logs)
                     if sanitized_phone in call.get('participants', [])
                 ]
 
                 if messages:
                     partner.message_post(
-                        body='<br/>'.join(messages),
+                        body=Markup('<br/>'.join(messages)),
                         subject=_("Fetched Call Logs"),
                         subtype_id=self.env.ref('mail.mt_note').id,  # Ensure proper message subtype
                     )
