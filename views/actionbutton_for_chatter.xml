@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <record id="view_partner_form_chatter_inherit" model="ir.ui.view">
+        <field name="name">res.partner.form.chatter.inherit.fetch.call.logs</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@class='oe_title mb24']" position="before">
+                <button name="action_fetch_call_logs"
+                        string="Get Open Phone Call History"
+                        class="btn btn-primary mb-2"
+                        type="object"
+                        />
+            </xpath>
+        </field>
+    </record>
+</odoo>
