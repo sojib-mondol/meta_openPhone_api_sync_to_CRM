@@ -13,6 +13,7 @@
         'views/res_config_settings_views.xml',
         'views/openphone_sync_menu.xml',
         'views/add_openphone_contact_id_in_res_partner_from_view.xml',
+        'views/actionbutton_for_chatter.xml',
     ],
     'assets': {
         'web.assets_backend': [
