@@ -6,7 +6,6 @@ from datetime import datetime
 import urllib.parse
 from markupsafe import Markup
 
-
 _logger = logging.getLogger(__name__)
 
 class ResPartner(models.Model):
@@ -17,19 +16,34 @@ class ResPartner(models.Model):
         Normalize the phone number to remove spaces, dashes, and parentheses,
         and ensure it has a leading '+' for international format.
         """
-        # Remove non-digit characters except '+'
         cleaned_phone = ''.join(c for c in phone if c.isdigit() or c == '+')
-
-        # Ensure it starts with '+1' if it does not already have a country code
         if not cleaned_phone.startswith('+'):
             cleaned_phone = '+1' + cleaned_phone
-
         return cleaned_phone
 
-    def _format_call_log_message(self, call, sanitized_phone, index):
+    def _fetch_call_recording(self, call_id, headers):
+        """
+        Fetch the call recording URL for a specific call ID.
+        """
+        api_url = f"https://api.openphone.com/v1/call-recordings/{call_id}"
+        try:
+            response = requests.get(api_url, headers=headers)
+            response.raise_for_status()
+            recording_data = response.json()
+            _logger.debug("Call recording data for call ID %s: %s", call_id, recording_data)
+            return recording_data.get('url')  # Assuming the response contains 'url' key for the recording
+        except requests.exceptions.RequestException as e:
+            _logger.error("Error fetching call recording for call ID %s: %s", call_id, e)
+            return None
+
+    def _format_call_log_message(self, call, sanitized_phone, index, headers):
         """
         Format a single call log into an HTML message for the chatter.
         """
+        
+        # Log the full JSON data of the call for debugging
+        _logger.info("Processing call log %d: %s", index, call)
+    
         direction = tools.html_escape(call.get('direction', 'unknown').capitalize())
         status = tools.html_escape(call.get('status', 'unknown').capitalize())
         duration = tools.html_escape(str(call.get('duration', 0)))
@@ -42,6 +56,20 @@ class ResPartner(models.Model):
 
         participants = ', '.join(tools.html_escape(p) for p in call.get('participants', []))
 
+        # Get the call ID from the JSON data
+        call_id = call.get('id')
+        call_id_html = f"<li><b>Call ID:</b> {tools.html_escape(call_id)}</li>" if call_id else "<li><b>Call ID:</b> Not Available</li>"
+
+        # Call recording URL (if available)
+        call_recording_url = None
+        if call_id:
+            call_recording_url = self._fetch_call_recording(call_id, headers)
+
+        call_recording_html = (
+            f"<li><b>Call Recording:</b> <a href='{tools.html_escape(call_recording_url)}' target='_blank'>Download</a></li>"
+            if call_recording_url else "<li><b>Call Recording:</b> Not Available</li>"
+        )
+
         return _(
             """
             <b>Call Log %d:</b><br/>
@@ -52,9 +80,11 @@ class ResPartner(models.Model):
                 <li><b>Participants:</b> %s</li>
                 <li><b>Created At:</b> %s</li>
                 <li><b>Completed At:</b> %s</li>
+                %s
+                %s
             </ul>
             """
-        ) % (index, direction, status, duration, participants, created_at, completed_at)
+        ) % (index, direction, status, duration, participants, created_at, completed_at, call_id_html, call_recording_html)
 
     def action_fetch_call_logs(self):
         """
@@ -78,9 +108,8 @@ class ResPartner(models.Model):
                 )
                 continue
 
-            # Normalize the phone number 
             sanitized_phone = self._normalize_phone_number(partner.phone)
-            encoded_phone = urllib.parse.quote(sanitized_phone)  # URL-encode the phone number
+            encoded_phone = urllib.parse.quote(sanitized_phone)
             api_url = (
                 f"https://api.openphone.com/v1/calls"
                 f"?phoneNumberId={openphone_phone_number_id}"
@@ -103,7 +132,7 @@ class ResPartner(models.Model):
                     continue
 
                 messages = [
-                    self._format_call_log_message(call, sanitized_phone, index + 1)
+                    self._format_call_log_message(call, sanitized_phone, index + 1, headers)
                     for index, call in enumerate(call_logs)
                     if sanitized_phone in call.get('participants', [])
                 ]
@@ -112,7 +141,7 @@ class ResPartner(models.Model):
                     partner.message_post(
                         body=Markup('<br/>'.join(messages)),
                         subject=_("Fetched Call Logs"),
-                        subtype_id=self.env.ref('mail.mt_note').id,  # Ensure proper message subtype
+                        subtype_id=self.env.ref('mail.mt_note').id,
                     )
                 else:
                     partner.message_post(
