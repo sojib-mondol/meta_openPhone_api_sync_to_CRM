@@ -26,13 +26,44 @@ class ResPartner(models.Model):
         Fetch the call recording URL for a specific call ID.
         """
         api_url = f"https://api.openphone.com/v1/call-recordings/{call_id}"
+        
         try:
+            _logger.debug("Fetching call recording for call ID %s", call_id)
+            
+            # Send GET request to OpenPhone API
             response = requests.get(api_url, headers=headers)
+            
+            # Log the response status code and body
+            _logger.debug("API response status code for call recording request: %s", response.status_code)
+            _logger.debug("API response body for call recording request: %s", response.text)
+            
+            # Raise an error for bad responses (non-200 status codes)
             response.raise_for_status()
+
+            # Parse the response JSON
             recording_data = response.json()
+            
             _logger.debug("Call recording data for call ID %s: %s", call_id, recording_data)
-            return recording_data.get('url')  # Assuming the response contains 'url' key for the recording
+
+            # Ensure 'data' key exists and contains a list with recordings
+            if 'data' in recording_data and isinstance(recording_data['data'], list) and len(recording_data['data']) > 0:
+                # Access the first recording in the 'data' array
+                recording_info = recording_data['data'][0]
+                
+                _logger.debug("Recording info for call ID %s: %s", call_id, recording_info)
+                
+                # Check if 'url' key is present in the recording info
+                if 'url' in recording_info:
+                    _logger.debug("Recording URL found for call ID %s: %s", call_id, recording_info['url'])
+                    return recording_info['url']
+                else:
+                    _logger.warning("Recording URL not found for call ID %s. Full API response: %s", call_id, recording_data)
+                    return None
+            else:
+                _logger.warning("No recording data found for call ID %s. Full API response: %s", call_id, recording_data)
+                return None
         except requests.exceptions.RequestException as e:
+            # Log any request exception (like network issues or non-200 responses)
             _logger.error("Error fetching call recording for call ID %s: %s", call_id, e)
             return None
 
@@ -42,7 +73,7 @@ class ResPartner(models.Model):
         """
         
         # Log the full JSON data of the call for debugging
-        _logger.info("Processing call log %d: %s", index, call)
+        _logger.debug("Processing call log %d: %s", index, call)
     
         direction = tools.html_escape(call.get('direction', 'unknown').capitalize())
         status = tools.html_escape(call.get('status', 'unknown').capitalize())
@@ -65,11 +96,13 @@ class ResPartner(models.Model):
         if call_id:
             call_recording_url = self._fetch_call_recording(call_id, headers)
 
+        # Prepare HTML for the call log message
         call_recording_html = (
             f"<li><b>Call Recording:</b> <a href='{tools.html_escape(call_recording_url)}' target='_blank'>Download</a></li>"
             if call_recording_url else "<li><b>Call Recording:</b> Not Available</li>"
         )
 
+        # Return the formatted message for the chatter
         return _(
             """
             <b>Call Log %d:</b><br/>
@@ -121,6 +154,8 @@ class ResPartner(models.Model):
 
             try:
                 response = requests.get(api_url, headers=headers)
+                _logger.debug("API response status code for call logs: %s", response.status_code)
+                _logger.debug("API response body for call logs: %s", response.text)
                 response.raise_for_status()
                 call_logs = response.json().get('data', [])
 
